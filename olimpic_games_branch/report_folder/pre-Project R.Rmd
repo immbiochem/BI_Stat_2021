@@ -1,0 +1,112 @@
+---
+title: "pre-Project R 1"
+author: "Куприянов Семен"
+date: "24 10 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Пробная версия rmd файла для теста первой функции
+1 Напишем функцию, которая объединяет файлы с одинаковым расширением из папки
+
+```{r}
+integrator <- function(path_to_file, ind){
+  setwd(path_to_file) #меняем директорию на указанную в аргументе
+  names_of_files <- dir(getwd()) #вектор со всеми файлами в директории
+  is_ind <- function(x, ind){
+    parts <- strsplit(x,".",fixed=TRUE)
+    nparts <- length(parts[[1]]) 
+    return(parts[[1]][nparts] == ind) 
+  } #функция, определяющая наличие расширения ind
+  mk_table_csv <- function(x){
+    return(read.csv(x))
+  } #открывает файл с помощью read.csv 
+  mk_table_table <- function(x){
+    return(read.table(x)) 
+  } #открывает файл с помощью read.table
+  table_maker <- function(named_vector, mk_table_f){
+    just_table <- mk_table_f(named_vector[1])
+    for (i in named_vector[-1]){
+      just_table <- rbind(just_table, mk_table_f(i))
+    }
+    return(just_table)
+  } #соединяет файлы из указанного вектора в один
+  if (ind == "csv"){
+    finish_table <- table_maker(names_of_files[sapply(names_of_files,is_ind, ind)], mk_table_csv)
+    
+  } else{
+    finish_table <- table_maker(names_of_files[sapply(names_of_files,is_ind, ind)], mk_table_table)
+    
+  }
+  return(finish_table)
+}
+```
+
+Условия ввода:
+1) путь нужно прописывать в первом аргументе
+2) все аргументы являются строками и прописываются в ""
+3) расширение указывается без точки, например "csv"
+
+Пример:
+integrator("C:/Users/x/OneDrive/Рабочий стол/Dir1/Projects", "csv")
+
+2 Посмотрите, действительно ли все данные корректны? Если найдете, что что-то не так, то исправьте это, пожалуйста. Объясните, почему вы воспользовались именно этим подходом. Может быть у него есть альтернативы?
+
+Обозначим наши данные как olimpic, присвоив этой переменной результат функции integrator
+
+Пример:
+```{r}
+olimpic <- integrator("path_to_file", "csv")
+```
+
+Проверим структуру данных
+```{r}
+str(olimpic)
+```
+
+1) преобразуем в факторы те переменные, где это оправдано и изучим, что поменялось:
+```{r}
+olimpic$Sex <- factor(olimpic$Sex) 
+olimpic$NOC <- factor(olimpic$NOC) 
+olimpic$Sport <- factor(olimpic$Sport) 
+olimpic$Season <- factor(olimpic$Season) 
+olimpic$Medal <- factor(olimpic$Medal) 
+olimpic$Team <- factor(olimpic$Team) 
+str(olimpic)
+```
+Видим большое количество пропущенных значний в виде '', а не NA. В разделе пола видим дополнительный пол F
+
+2) посмотрим на простое описание данных:
+```{r}
+summary(olimpic)
+```
+Видим, что в столбце роста и возраста есть невероятные чудеса, вроде 240-летнего спортсмена, человека 3,5 метра и т.д
+
+3) посмотрим на общий вид таблицы:
+```{r}
+View(olimpic)
+```
+Видим, что столбец Games можно удалить, т.к. он дублирует дату и сезон
+
+
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
