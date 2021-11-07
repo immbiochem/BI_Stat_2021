@@ -1,0 +1,5 @@
+For the RMD file to work properly, you need the following:
+
+1) In the first function, you need to specify the path and file extension for the merge. You can do this by writing the appropriate lines to the "path" and "ind" variables inside the chunk.
+
+2) Requires ggplot 2, dplyr and data.table libraries to run the code successfully.
