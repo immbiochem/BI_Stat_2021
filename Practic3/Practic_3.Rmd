@@ -1,0 +1,185 @@
+---
+title: "Practic 3"
+author: "Kupriyanov Semyon"
+date: "24 11 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Study of drug activity
+
+#### 1) Function that combines data from a folder into a dataset
+```{r}
+integrator <- function(path_to_file, ind){
+  setwd(path_to_file) #меняем директорию на указанную в аргументе
+  names_of_files <- dir(getwd()) #вектор со всеми файлами в директории
+  is_ind <- function(x, ind){
+    parts <- strsplit(x,".",fixed=TRUE)
+    nparts <- length(parts[[1]]) 
+    return(parts[[1]][nparts] == ind) 
+  } #функция, определяющая наличие расширения ind
+  mk_table_csv <- function(x){
+    return(read.csv(x))
+  } #открывает файл с помощью read.csv 
+  mk_table_table <- function(x){
+    return(read.table(x)) 
+  } #открывает файл с помощью read.table
+  table_maker <- function(named_vector, mk_table_f){
+    just_table <- mk_table_f(named_vector[1])
+    for (i in named_vector[-1]){
+      just_table <- rbind(just_table, mk_table_f(i))
+    }
+    return(just_table)
+  } #соединяет файлы из указанного вектора в один
+  if (ind == "csv"){
+    finish_table <- table_maker(names_of_files[sapply(names_of_files,is_ind, ind)], mk_table_csv)
+    
+  } else{
+    finish_table <- table_maker(names_of_files[sapply(names_of_files,is_ind, ind)], mk_table_table)
+    
+  }
+  return(finish_table)
+}
+practic <- integrator("C:/Users/pfft/OneDrive/Рабочий стол/БИ/R stat/Задание на практику 3/Data", "csv")
+library("ggplot2")
+library("dplyr")
+
+```
+
+#### 2) EDA for received data. Let's convert the data to the form tidy data.
+Examining the data structure
+```{r}
+str(practic)
+summary(practic)
+```
+
+Variables gender, type of drug, hospital discharge should be adjusted to the type of factor. Incorrect values were found in the data of gender, age (too large results and the presence of a nominative feature).The NA values should be removed.
+```{r}
+practic$gender <- factor(practic$gender)
+practic$drug_type <- factor(practic$drug_type)
+practic$is_relapse <- factor(practic$is_relapse)
+practic$gender[practic$gender == "malle"] <- "male"
+unique(practic$age)
+practic$age[practic$age == "thirty-one"] <- "31"
+practic$age[practic$age == "220"] <- NA
+practic$age[practic$age == "350"] <- NA
+practic$age <- as.numeric(practic$age)
+practic <- na.omit(practic)
+```
+
+Let's carry out an EDA. Let's look at the relationship of each variable to each.
+```{r}
+pairs(practic)
+```
+
+Let's do some visualization. Our main variable is the number of days in the hospital. Let's build various graphs to determine its distribution and relationship with other values (we will be interested in gender, type of medicine, which can be seen from the results of the "pairs" function).
+
+##### Let us construct a graph of the density distribution of the days of hospitalization. We will also build boxplots for hospitalization together with the type of medication, as well as the gender.
+```{r}
+ggplot(practic, aes(x=days_in_hospital))+geom_density()+theme_bw()
+ggplot(practic, aes(y=days_in_hospital, x=drug_type))+geom_boxplot()+theme_bw()
+ggplot(practic, aes(y=days_in_hospital, x=drug_type, fill=gender))+geom_boxplot()+theme_bw()
+
+
+```
+##### Let's build QQ-plots for hospitalization days and different types of drugs. 
+```{r}
+qqnorm(practic$days_in_hospital[practic$drug_type=="New_type_1"])
+qqline(practic$days_in_hospital[practic$drug_type=="New_type_1"])
+
+qqnorm(practic$days_in_hospital[practic$drug_type=="New_type_2"])
+qqline(practic$days_in_hospital[practic$drug_type=="New_type_2"])
+
+qqnorm(practic$days_in_hospital[practic$drug_type=="Old_type"])
+qqline(practic$days_in_hospital[practic$drug_type=="Old_type"])
+
+qqnorm(practic$days_in_hospital[practic$drug_type=="Placebo"])
+qqline(practic$days_in_hospital[practic$drug_type=="Placebo"])
+```
+It is possible to draw conclusions about the abnormality of the distribution. Boxplots also show emissions. Let's remove significant emissions.
+```{r}
+practic <- practic %>% filter(days_in_hospital<37 & days_in_hospital>15)
+
+```
+
+#### 3) Find the mean and standard deviation of the number of days required for treatment, regardless of gender.
+
+```{r}
+practic %>% summarise(Mean=mean(days_in_hospital), SD=sd(days_in_hospital))
+
+```
+
+#### 4) Let's designate the number of days for men and women separately, which they spent in the hospital.
+
+```{r}
+ggplot(practic, aes(y=days_in_hospital, x=gender))+geom_boxplot()+
+  ggtitle("The number of days for men and women that they spent in the hospital")+
+  xlab("Gender")+ 
+  ylab("Days in hospital")+
+  theme_bw()
+```
+
+#### 5) Investigating the effect of a second new drug versus placebo in women.
+
+```{r}
+practic_female<- practic %>% filter(gender=="female", drug_type=="Placebo"|drug_type=="New_type_2")
+# normality check
+shapiro.test(practic_female$days_in_hospital[practic_female$drug_type=="Placebo"])
+shapiro.test(practic_female$days_in_hospital[practic_female$drug_type=="New_type_2"])
+
+```
+
+One value is not normally distributed, therefore, it is correct to apply the nonparametric Mann-Whitney test.
+
+```{r}
+wil <- wilcox.test(days_in_hospital~drug_type, practic_female)
+ggplot(practic_female, aes(y=days_in_hospital, x=drug_type))+geom_boxplot()+ ggtitle("Comparison of new type 2 drug with placebo in a female group")+xlab("Drug type") + ylab("Days in hospital")+theme_bw()
+cat("Method:", wil$method, "Statistic:", wil$statistic, "P-value:", round(wil$p.value, 6))
+
+```
+#### 6) Let's explore the relationship between the drug and the number of days spent in the hospital.
+
+```{r}
+fit <- aov(days_in_hospital~drug_type, practic) 
+summary(fit)
+```
+The model shows no significant differences between groups. We also investigate the effect of gender and its interaction with variables of hospitalization and type of medication (this is rational since we saw it in the EDA).
+
+```{r}
+fit2 <- aov(days_in_hospital~drug_type*gender, practic)
+summary(fit2)
+```
+
+We now get meaningful results when comparing drugs and also for interactions between the drug type and gender variable.
+
+```{r}
+TukeyHSD(fit2)
+
+```
+We got significant differences between the old drugs and the new type II drug. But these differences are revealed only when the gender variable is included in the analysis. Let us deduce in more detail those interactions that turned out to be significant in the study of the interaction of gender and the type of drug.
+
+```{r}
+fit3 <- TukeyHSD(fit2)
+fit4 <-fit3$`drug_type:gender`
+fit4 <- as.data.frame(fit4)
+ggplot(practic, aes(y=days_in_hospital, x=drug_type, fill=gender))+
+  geom_boxplot()+
+  ggtitle("Comparison of days of hospitalization by type of medication in different gender groups")+
+  xlab("Drug type")+ 
+  ylab("Days in hospital")+
+  theme_bw()
+fit4[fit4[ ,4]<0.05, ][c(1,4)]
+```
+
+#### Conclusions
+This study demonstrates the significant effect of study drugs on hospital admission in relation to gender. The biggest differences are between the second drug and the old type. Their effects not only differ significantly, but also diverge depending on gender (reciprocal interaction).
+
+
+
+
+
+
+
